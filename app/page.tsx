@@ -264,15 +264,19 @@ function MainPlatform() {
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-surface-900 border-b border-surface-800 h-20 flex items-center shrink-0">
         <div className="w-full max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div 
-              className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center cursor-pointer hover:bg-emerald-600 transition-colors"
-              onClick={() => setView('admin')}
-              title=""
-            >
-              <div className="w-5 h-5 border-2 border-white rounded-sm pointer-events-none"></div>
+          <div className="flex items-center gap-3 relative">
+            <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center">
+              <GraduationCap className="w-6 h-6" />
             </div>
             <span className="text-2xl font-bold text-surface-text tracking-tight cursor-pointer" onClick={() => setView('student')}>أكاديميا</span>
+            
+            {/* Secret Admin Access - Double click the logo area */}
+            <div 
+              className="absolute inset-0 z-10 cursor-pointer opacity-0"
+              onDoubleClick={() => setView('admin')}
+              title=""
+            >
+            </div>
           </div>
           
           <button
