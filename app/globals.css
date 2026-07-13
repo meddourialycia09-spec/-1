@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-tajawal), system-ui, sans-serif;
+  
+  --color-surface-950: var(--semantic-950);
+  --color-surface-900: var(--semantic-900);
+  --color-surface-800: var(--semantic-800);
+  --color-surface-700: var(--semantic-700);
+  --color-surface-600: var(--semantic-600);
+  --color-surface-500: var(--semantic-500);
+  --color-surface-400: var(--semantic-400);
+  --color-surface-300: var(--semantic-300);
+  --color-surface-200: var(--semantic-200);
+  --color-surface-100: var(--semantic-100);
+  --color-surface-50:  var(--semantic-50);
+  --color-surface-text: var(--semantic-text);
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer base {
+  :root {
+    /* Dark mode by default */
+    --semantic-950: var(--color-slate-950);
+    --semantic-900: var(--color-slate-900);
+    --semantic-800: var(--color-slate-800);
+    --semantic-700: var(--color-slate-700);
+    --semantic-600: var(--color-slate-600);
+    --semantic-500: var(--color-slate-500);
+    --semantic-400: var(--color-slate-400);
+    --semantic-300: var(--color-slate-300);
+    --semantic-200: var(--color-slate-200);
+    --semantic-100: var(--color-slate-100);
+    --semantic-50:  var(--color-slate-50);
+    --semantic-text: #ffffff;
+  }
+  
+  :root.light {
+    --semantic-950: var(--color-slate-50);
+    --semantic-900: #ffffff;
+    --semantic-800: var(--color-slate-100);
+    --semantic-700: var(--color-slate-200);
+    --semantic-600: var(--color-slate-300);
+    --semantic-500: var(--color-slate-500);
+    --semantic-400: var(--color-slate-600);
+    --semantic-300: var(--color-slate-700);
+    --semantic-200: var(--color-slate-800);
+    --semantic-100: var(--color-slate-900);
+    --semantic-50:  var(--color-slate-950);
+    --semantic-text: var(--color-slate-900);
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "منصة أكاديميا",
+  "description": "منصة تعليمية متكاملة لتقديم الكورسات وإدارتها مع لوحة تحكم إدارية",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
