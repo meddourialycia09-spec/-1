@@ -319,7 +319,14 @@ function MainPlatform() {
               transition={{ duration: 0.3 }}
             >
               {isAdminAuthenticated ? (
-                <AdminView courses={courses} registrations={registrations} testimonials={testimonials} />
+                <AdminView 
+    courses={courses} 
+    registrations={registrations} 
+    testimonials={testimonials} 
+    onRefreshCourses={fetchCourses} 
+    onRefreshRegistrations={fetchRegistrations} 
+    onRefreshTestimonials={fetchTestimonials} 
+  />
               ) : (
                 <AdminLogin 
                   onLogin={() => setIsAdminAuthenticated(true)} 
@@ -855,7 +862,21 @@ function AdminLogin({ onLogin, onCancel }: { onLogin: () => void, onCancel: () =
   );
 }
 
-function AdminView({ courses, registrations, testimonials }: { courses: Course[]; registrations: Registration[]; testimonials: Testimonial[] }) {
+function AdminView({ 
+  courses, 
+  registrations, 
+  testimonials, 
+  onRefreshCourses, 
+  onRefreshRegistrations, 
+  onRefreshTestimonials 
+}: { 
+  courses: Course[]; 
+  registrations: Registration[]; 
+  testimonials: Testimonial[]; 
+  onRefreshCourses?: () => void; 
+  onRefreshRegistrations?: () => void; 
+  onRefreshTestimonials?: () => void; 
+}) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'courses' | 'registrations' | 'testimonials' | 'settings'>('dashboard');
 
   return (
@@ -943,17 +964,17 @@ function AdminView({ courses, registrations, testimonials }: { courses: Course[]
           {activeTab === 'courses' && (
 
             <motion.div key="admin-courses" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <AdminCourses courses={courses} registrations={registrations} />
+              <AdminCourses courses={courses} registrations={registrations} onRefreshCourses={onRefreshCourses} />
             </motion.div>
           )}
           {activeTab === 'registrations' && (
             <motion.div key="admin-regs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <AdminRegistrations registrations={registrations} />
+              <AdminRegistrations registrations={registrations} onRefreshRegistrations={onRefreshRegistrations} />
             </motion.div>
           )}
           {activeTab === 'testimonials' && (
             <motion.div key="admin-testimonials" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <AdminTestimonials testimonials={testimonials} />
+              <AdminTestimonials testimonials={testimonials} onRefreshTestimonials={onRefreshTestimonials} />
             </motion.div>
           )}
           {activeTab === 'settings' && (
@@ -1141,7 +1162,15 @@ function AdminSettings() {
   );
 }
 
-function AdminCourses({ courses, registrations }: { courses: Course[]; registrations: Registration[] }) {
+function AdminCourses({ 
+  courses, 
+  registrations, 
+  onRefreshCourses 
+}: { 
+  courses: Course[]; 
+  registrations: Registration[]; 
+  onRefreshCourses?: () => void; 
+}) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1152,20 +1181,34 @@ function AdminCourses({ courses, registrations }: { courses: Course[]; registrat
     setLoading(true);
 
     const courseData = {
-      ...formData,
-      price: parseFloat(formData.price) || 0
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      price: parseFloat(formData.price) || 0,
+      duration: formData.duration.trim()
     };
 
-    if (editingCourseId) {
-      await supabase.from('courses').update(courseData).eq('id', editingCourseId);
-    } else {
-      await supabase.from('courses').insert([courseData]);
-    }
+    try {
+      if (editingCourseId) {
+        const { error } = await supabase.from('courses').update(courseData).eq('id', editingCourseId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('courses').insert([courseData]);
+        if (error) throw error;
+      }
 
-    setFormData({ title: '', description: '', price: '', duration: '' });
-    setIsAdding(false);
-    setEditingCourseId(null);
-    setLoading(false);
+      setFormData({ title: '', description: '', price: '', duration: '' });
+      setIsAdding(false);
+      setEditingCourseId(null);
+
+      if (onRefreshCourses) {
+        await onRefreshCourses();
+      }
+    } catch (err: any) {
+      console.error('Error saving course:', err);
+      alert('حدث خطأ أثناء حفظ الكورس: ' + (err.message || 'يرجى المحاولة مرة أخرى'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEditClick = (course: Course) => {
@@ -1187,7 +1230,16 @@ function AdminCourses({ courses, registrations }: { courses: Course[]; registrat
 
   const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا الكورس؟')) {
-      await supabase.from('courses').delete().eq('id', id);
+      try {
+        const { error } = await supabase.from('courses').delete().eq('id', id);
+        if (error) throw error;
+        if (onRefreshCourses) {
+          await onRefreshCourses();
+        }
+      } catch (err: any) {
+        console.error('Error deleting course:', err);
+        alert('حدث خطأ أثناء حذف الكورس: ' + (err.message || 'يرجى المحاولة مرة أخرى'));
+      }
     }
   };
 
@@ -1238,7 +1290,8 @@ function AdminCourses({ courses, registrations }: { courses: Course[]; registrat
                   <input required type="number" min="0" step="0.01" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-surface-900 border border-surface-700 text-surface-text rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-emerald-500 transition-colors text-left" dir="ltr" placeholder="99.00" />
                 </div>
               </div>
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={cancelAddOrEdit} className="px-6 py-2.5 rounded-lg text-sm font-medium text-surface-400 hover:text-surface-200 transition-colors">إلغاء</button>
                 <button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50">
                   {loading ? 'جاري الحفظ...' : 'حفظ الكورس'}
                 </button>
@@ -1254,7 +1307,7 @@ function AdminCourses({ courses, registrations }: { courses: Course[]; registrat
             <thead className="text-[10px] text-surface-500 uppercase tracking-widest bg-surface-900/50 border-b border-surface-800">
               <tr>
                 <th className="px-6 py-4 font-medium text-right">الكورس</th>
-<th className="px-6 py-4 font-medium text-center">الطلاب</th>
+                <th className="px-6 py-4 font-medium text-center">المسجلين</th>
                 <th className="px-6 py-4 font-medium text-right">المدة</th>
                 <th className="px-6 py-4 font-medium text-right">السعر</th>
                 <th className="px-6 py-4 font-medium text-center">إجراءات</th>
@@ -1266,26 +1319,34 @@ function AdminCourses({ courses, registrations }: { courses: Course[]; registrat
                   <td colSpan={5} className="px-6 py-8 text-center text-surface-500">لا يوجد كورسات حالياً. قم بإضافة كورس جديد.</td>
                 </tr>
               ) : (
-                courses.map(course => (
-                  <tr key={course.id} className="hover:bg-surface-800/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-surface-200">{course.title}</div>
-                      <div className="text-surface-500 text-xs mt-1 truncate max-w-xs">{course.description}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">{course.duration}</td>
-                    <td className="px-6 py-4 font-medium text-emerald-400 whitespace-nowrap">${course.price}</td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => handleEditClick(course)} className="p-2 text-surface-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors" title="تعديل">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(course.id)} className="p-2 text-surface-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="حذف">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                courses.map(course => {
+                  const enrolledCount = registrations.filter(r => r.course_id === course.id).length;
+                  return (
+                    <tr key={course.id} className="hover:bg-surface-800/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-surface-200">{course.title}</div>
+                        <div className="text-surface-500 text-xs mt-1 truncate max-w-xs">{course.description}</div>
+                      </td>
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
+                        <span className="bg-emerald-500/10 text-emerald-400 font-bold px-2.5 py-1 rounded-full text-xs">
+                          {enrolledCount} طالب
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{course.duration || 'غير محدد'}</td>
+                      <td className="px-6 py-4 font-medium text-emerald-400 whitespace-nowrap">${course.price}</td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => handleEditClick(course)} className="p-2 text-surface-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors" title="تعديل">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(course.id)} className="p-2 text-surface-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="حذف">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -1295,7 +1356,13 @@ function AdminCourses({ courses, registrations }: { courses: Course[]; registrat
   );
 }
 
-function AdminTestimonials({ testimonials }: { testimonials: Testimonial[] }) {
+function AdminTestimonials({ 
+  testimonials, 
+  onRefreshTestimonials 
+}: { 
+  testimonials: Testimonial[]; 
+  onRefreshTestimonials?: () => void; 
+}) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1306,22 +1373,34 @@ function AdminTestimonials({ testimonials }: { testimonials: Testimonial[] }) {
     setLoading(true);
 
     const testData = {
-      student_name: formData.student_name,
-      content: formData.content,
+      student_name: formData.student_name.trim(),
+      content: formData.content.trim(),
       rating: parseInt(formData.rating) || 5,
       is_published: formData.is_published
     };
 
-    if (editingId) {
-      await supabase.from('testimonials').update(testData).eq('id', editingId);
-    } else {
-      await supabase.from('testimonials').insert([testData]);
-    }
+    try {
+      if (editingId) {
+        const { error } = await supabase.from('testimonials').update(testData).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('testimonials').insert([testData]);
+        if (error) throw error;
+      }
 
-    setFormData({ student_name: '', content: '', rating: '5', is_published: false });
-    setIsAdding(false);
-    setEditingId(null);
-    setLoading(false);
+      setFormData({ student_name: '', content: '', rating: '5', is_published: false });
+      setIsAdding(false);
+      setEditingId(null);
+
+      if (onRefreshTestimonials) {
+        await onRefreshTestimonials();
+      }
+    } catch (err: any) {
+      console.error('Error saving testimonial:', err);
+      alert('حدث خطأ أثناء حفظ التقييم: ' + (err.message || 'يرجى المحاولة مرة أخرى'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEditClick = (test: Testimonial) => {
@@ -1343,12 +1422,30 @@ function AdminTestimonials({ testimonials }: { testimonials: Testimonial[] }) {
 
   const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا التقييم؟')) {
-      await supabase.from('testimonials').delete().eq('id', id);
+      try {
+        const { error } = await supabase.from('testimonials').delete().eq('id', id);
+        if (error) throw error;
+        if (onRefreshTestimonials) {
+          await onRefreshTestimonials();
+        }
+      } catch (err: any) {
+        console.error('Error deleting testimonial:', err);
+        alert('حدث خطأ أثناء حذف التقييم: ' + (err.message || 'يرجى المحاولة مرة أخرى'));
+      }
     }
   };
 
   const togglePublish = async (test: Testimonial) => {
-    await supabase.from('testimonials').update({ is_published: !test.is_published }).eq('id', test.id);
+    try {
+      const { error } = await supabase.from('testimonials').update({ is_published: !test.is_published }).eq('id', test.id);
+      if (error) throw error;
+      if (onRefreshTestimonials) {
+        await onRefreshTestimonials();
+      }
+    } catch (err: any) {
+      console.error('Error toggling publish state:', err);
+      alert('حدث خطأ أثناء تغيير حالة النشر');
+    }
   };
 
   return (
@@ -1389,7 +1486,7 @@ function AdminTestimonials({ testimonials }: { testimonials: Testimonial[] }) {
               <textarea required rows={3} value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} className="w-full bg-surface-900 border border-surface-700 text-surface-text rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-emerald-500 transition-colors resize-none" placeholder="اكتب التقييم..." />
             </div>
             <div className="flex items-center gap-2 md:col-span-2">
-              <input type="checkbox" id="is_published" checked={formData.is_published} onChange={e => setFormData({...formData, is_published: e.target.checked})} className="w-4 h-4 text-emerald-500 bg-surface-900 border-surface-700 rounded focus:ring-emerald-500" />
+              <input type="checkbox" id="is_published" checked={formData.is_published} onChange={e => setFormData({...formData, is_published: e.target.checked})} className="w-4 h-4 text-emerald-500 bg-surface-900 border-surface-700 rounded focus:ring-emerald-500 cursor-pointer" />
               <label htmlFor="is_published" className="text-sm text-surface-300 cursor-pointer">نشر في الصفحة الرئيسية</label>
             </div>
           </div>
@@ -1435,7 +1532,7 @@ function AdminTestimonials({ testimonials }: { testimonials: Testimonial[] }) {
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => togglePublish(test)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold border ${test.is_published ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-surface-800 text-surface-500 border-surface-700'}`}
+                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${test.is_published ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-surface-800 text-surface-500 border-surface-700 hover:bg-surface-700'}`}
                       >
                         {test.is_published ? 'منشور' : 'مخفي'}
                       </button>
@@ -1461,8 +1558,28 @@ function AdminTestimonials({ testimonials }: { testimonials: Testimonial[] }) {
   );
 }
 
-function AdminRegistrations({ registrations }: { registrations: Registration[] }) {
-  // Format date helper
+function AdminRegistrations({ 
+  registrations, 
+  onRefreshRegistrations 
+}: { 
+  registrations: Registration[]; 
+  onRefreshRegistrations?: () => void; 
+}) {
+  const handleDeleteRegistration = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا الطلب؟')) {
+      try {
+        const { error } = await supabase.from('registrations').delete().eq('id', id);
+        if (error) throw error;
+        if (onRefreshRegistrations) {
+          await onRefreshRegistrations();
+        }
+      } catch (err: any) {
+        console.error('Error deleting registration:', err);
+        alert('حدث خطأ أثناء حذف طلب التسجيل: ' + (err.message || 'يرجى المحاولة مرة أخرى'));
+      }
+    }
+  };
+
   const formatDate = (dateString: string) => {
     try {
       return new Intl.DateTimeFormat('ar-SA', {
@@ -1479,9 +1596,14 @@ function AdminRegistrations({ registrations }: { registrations: Registration[] }
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-surface-text mb-1">طلبات التسجيل</h2>
-        <p className="text-surface-400 text-sm">متابعة الطلاب المسجلين حديثاً في الكورسات</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-surface-text mb-1">طلبات التسجيل</h2>
+          <p className="text-surface-400 text-sm">متابعة الطلاب المسجلين حديثاً في الكورسات</p>
+        </div>
+        <div className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
+          إجمالي الطلبات: {registrations.length}
+        </div>
       </div>
 
       <div className="bg-surface-950 border border-surface-800 rounded-2xl overflow-hidden">
@@ -1493,12 +1615,13 @@ function AdminRegistrations({ registrations }: { registrations: Registration[] }
                 <th className="px-6 py-4 font-medium text-right">التواصل</th>
                 <th className="px-6 py-4 font-medium text-right">الكورس</th>
                 <th className="px-6 py-4 font-medium text-right">تاريخ التسجيل</th>
+                <th className="px-6 py-4 font-medium text-center">إجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-800">
               {registrations.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-surface-500">لا يوجد طلبات تسجيل حتى الآن.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-surface-500">لا يوجد طلبات تسجيل حتى الآن.</td>
                 </tr>
               ) : (
                 registrations.map(reg => (
@@ -1525,6 +1648,15 @@ function AdminRegistrations({ registrations }: { registrations: Registration[] }
                       <div className="text-right">
                         {formatDate(reg.enrolled_at)}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => handleDeleteRegistration(reg.id)}
+                        className="p-2 text-surface-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                        title="حذف الطلب"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
